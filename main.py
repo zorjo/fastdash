@@ -20,24 +20,12 @@ client=read_json_file("client.json")
 SECRET_KEY="9ce9230d35ee14142be93578ca79a27030d0b2ad87b6aa3abbeabb535ea38df6"
 GOOGLE_CLIENT_ID = client["web"]["client_id"]
 GOOGLE_CLIENT_SECRET = client["web"]["client_secret"]
+
+
+
+
 app = FastAPI()
 
-class Item(BaseModel):
-    name: str
-    description: str = ""
-    date: str
-    id: int
-class User(BaseModel):
-    username: str
-    email: str
-    dashboard: bool
-    chatbox: bool
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-@app.get("/login")
-async def login():
-    return {"message": "Login page"}
 
 
 # Google OAuth2 configuration
@@ -46,6 +34,12 @@ google_sso = GoogleSSO(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, "http://localhost
 
 def get_google_sso():
     return GoogleSSO(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, "http://localhost:5000/login/google/redirect/")
+
+def read_json_file(file_path: str) -> dict:
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+    return data
+client=read_json_file("client.json")
 
 
 # Google OAuth2 flow
