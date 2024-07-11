@@ -1,11 +1,13 @@
 from fastapi_sso.sso.google import GoogleSSO
-from fastapi import FastAPI, Depends, HTTPException,Request
+from fastapi import FastAPI, Depends, HTTPException,Request,Security,Form
 from fastapi.security import APIKeyCookie
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+import sqlite3
 #from fastapi.security.utils import get_authorization_scheme_param
 from fastapi.responses import RedirectResponse
 import datetime
 from fastapi.requests import Request
-from fastapi import Security
 #from fastapi.security.oauth2 import OAuth2PasswordBearer
 #from pydantic import BaseModel
 #from google.oauth2 import id_token
@@ -24,6 +26,16 @@ SECRET_KEY="9ce9230d35ee14142be93578ca79a27030d0b2ad87b6aa3abbeabb535ea38df6"
 GOOGLE_CLIENT_ID = client["web"]["client_id"]
 GOOGLE_CLIENT_SECRET = client["web"]["client_secret"]
 
+templates = Jinja2Templates(directory="templates")
+
+conn = sqlite3.connect('checkbox_data.db')
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS checkbox_values
+             (email TEXT PRIMARY KEY,
+              isdashboard BOOLEAN,
+              ischatbox BOOLEAN)''')
+conn.commit()
+conn.close()
 
 
 
@@ -50,11 +62,16 @@ async def get_logged_user(cookie:str=Security(APIKeyCookie(name="token")))-> Ope
 
 @app.get("/protected")
 async def protected_endpoint(user: OpenID = Depends(get_logged_user)):
-    """This endpoint will say hello to the logged user.
+    """This endpoint will return a template html with the user's email.
+    
     If the user is not logged, it will return a 401 error from `get_logged_user`."""
     return {
         "message": f"You are very welcome, {user.email}!",
     }
+
+@app.get("/form", response_class=HTMLResponse)
+async def read_form(request:Request,user: OpenID = Depends(get_logged_user)):
+    return templates.TemplateResponse("form.html", {"request": request,"user":user.email})
 
 
 @app.get("/auth/login")
@@ -91,7 +108,7 @@ async def login_callback(request: Request):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=5000)
+    uvicorn.run(app, host="127.0.0.1", port=5000,reload=True)
 # @app.get("/homepage")
 # async def homepage(sso1=Depends(get_google_sso)):
 #         return {"message": sso1.access_token}
@@ -111,3 +128,90 @@ if __name__ == "__main__":
 #     return google_sso.access_token
 #     #token_url, state = await get_token(code)
 #     #return RedirectResponse(f"http://localhost:5000/homepage?token={token_url}")
+"""
+<!-- templates/form.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkbox Form</title>
+</head>
+<body>
+    <h1>Checkbox Form</h1>
+    <form action="/submit" method="post">
+        <label>
+            <input type="checkbox" name="checkbox1" value="true"> Checkbox 1
+        </label><br>
+        <label>
+            <input type="checkbox" name="checkbox2" value="true"> Checkbox 2
+        </label><br>
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>
+
+<!-- templates/results.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkbox Results</title>
+</head>
+<body>
+    <h1>Checkbox Results</h1>
+    {% if message %}
+        <p>{{ message }}</p>
+    {% else %}
+        <p>Checkbox 1: {{ "Checked" if checkbox1 else "Unchecked" }}</p>
+        <p>Checkbox 2: {{ "Checked" if checkbox2 else "Unchecked" }}</p>
+        <p>Timestamp: {{ timestamp }}</p>
+    {% endif %}
+    <a href="/">Back to Form</a>
+</body>
+</html>
+"""
+"""
+@app.get("/", response_class=HTMLResponse)
+async def read_form(request: Request):
+    return templates.TemplateResponse("form.html", {"request": request})
+
+@app.post("/submit")
+async def submit_form(checkbox1: bool = Form(False), checkbox2: bool = Form(False)):
+    conn = sqlite3.connect('checkbox_data.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO checkbox_values (checkbox1, checkbox2) VALUES (?, ?)",
+              (checkbox1, checkbox2))
+    conn.commit()
+    conn.close()
+    return {"message": "Data submitted successfully"}
+
+@app.get("/results", response_class=HTMLResponse)
+async def read_results(request: Request):
+    conn = sqlite3.connect('checkbox_data.db')
+    c = conn.cursor()
+    c.execute("SELECT checkbox1, checkbox2, timestamp FROM checkbox_values ORDER BY id DESC LIMIT 1")
+    result = c.fetchone()
+    conn.close()
+
+    if result:
+        checkbox1, checkbox2, timestamp = result
+        return templates.TemplateResponse("results.html", {
+            "request": request,
+            "checkbox1": checkbox1,
+            "checkbox2": checkbox2,
+            "timestamp": timestamp
+        })
+    else:
+        return templates.TemplateResponse("results.html", {
+            "request": request,
+            "message": "No data available"
+        })
+
+# You'll need to create two HTML templates in a 'templates' directory:
+# 1. form.html
+# 2. results.html
+
+
+"""
