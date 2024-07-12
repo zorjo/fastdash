@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Checkbox Results</title>
+    </head>
+    <body>
+        <h1>Checkbox Results</h1>
+        {% if message %}
+        <p>{{ message }}</p>
+        {% else %}
+        <p>Dashboard: {{ "Checked" if isdashboard else "Unchecked" }}</p>
+        <p>Chatbox: {{ "Checked" if ischatbox else "Unchecked" }}</p>
+        <p>Email: {{ email }}</p>
+        {% endif %}
+        <a href="/form">Back to Form</a>
+    </body>
+</html>

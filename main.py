@@ -1,3 +1,4 @@
+from typing import Text
 from fastapi_sso.sso.google import GoogleSSO
 from fastapi import FastAPI, Depends, HTTPException,Request,Security,Form
 from fastapi.security import APIKeyCookie
@@ -63,7 +64,7 @@ async def get_logged_user(cookie:str=Security(APIKeyCookie(name="token")))-> Ope
 @app.get("/protected")
 async def protected_endpoint(user: OpenID = Depends(get_logged_user)):
     """This endpoint will return a template html with the user's email.
-    
+
     If the user is not logged, it will return a 401 error from `get_logged_user`."""
     return {
         "message": f"You are very welcome, {user.email}!",
@@ -72,6 +73,43 @@ async def protected_endpoint(user: OpenID = Depends(get_logged_user)):
 @app.get("/form", response_class=HTMLResponse)
 async def read_form(request:Request,user: OpenID = Depends(get_logged_user)):
     return templates.TemplateResponse("form.html", {"request": request,"user":user.email})
+#@app.get("/", response_class=HTMLResponse)
+#async def read_form(request: Request):
+#    return templates.TemplateResponse("form.html", {"request": request})
+
+@app.post("/submit")
+async def submit_form(user=Depends(get_logged_user),  isdashboard: bool = Form(False), ischatbox: bool = Form(False)):
+    conn = sqlite3.connect('checkbox_data.db')
+    c = conn.cursor()
+    email=user.email
+    c.execute("INSERT OR REPLACE INTO checkbox_values (email,isdashboard, ischatbox) VALUES (?,?, ?)",
+              (email,isdashboard, ischatbox))
+    conn.commit()
+    conn.close()
+    return {"message": "Data submitted successfully"}
+@app.get("/results", response_class=HTMLResponse)
+async def read_results(request: Request,user: OpenID = Depends(get_logged_user)):
+    email=user.email
+    conn = sqlite3.connect('checkbox_data.db')
+    c = conn.cursor()
+    c.execute("SELECT email,isdashboard, ischatbox FROM checkbox_values where email=? LIMIT 1",(email,))
+    result = c.fetchone()
+    conn.close()
+
+    if result:
+        print(result)
+        email,isdashboard, ischatbox = result
+        return templates.TemplateResponse("results.html", {
+            "request": request,
+            "email": user.email,
+            "isdashboard": isdashboard,
+            "ischatbox": ischatbox
+        })
+    else:
+        return templates.TemplateResponse("results.html", {
+            "request": request,
+            "message": "No data available"
+        })
 
 
 @app.get("/auth/login")
@@ -108,7 +146,7 @@ async def login_callback(request: Request):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=5000,reload=True)
+    uvicorn.run("__main__:app", host="127.0.0.1", port=5000,reload=True)
 # @app.get("/homepage")
 # async def homepage(sso1=Depends(get_google_sso)):
 #         return {"message": sso1.access_token}
@@ -141,10 +179,10 @@ if __name__ == "__main__":
     <h1>Checkbox Form</h1>
     <form action="/submit" method="post">
         <label>
-            <input type="checkbox" name="checkbox1" value="true"> Checkbox 1
+            <input type="checkbox" name="isdashboard" value="true"> Checkbox 1
         </label><br>
         <label>
-            <input type="checkbox" name="checkbox2" value="true"> Checkbox 2
+            <input type="checkbox" name="ischatbox" value="true"> Checkbox 2
         </label><br>
         <input type="submit" value="Submit">
     </form>
@@ -164,8 +202,8 @@ if __name__ == "__main__":
     {% if message %}
         <p>{{ message }}</p>
     {% else %}
-        <p>Checkbox 1: {{ "Checked" if checkbox1 else "Unchecked" }}</p>
-        <p>Checkbox 2: {{ "Checked" if checkbox2 else "Unchecked" }}</p>
+        <p>Checkbox 1: {{ "Checked" if isdashboard else "Unchecked" }}</p>
+        <p>Checkbox 2: {{ "Checked" if ischatbox else "Unchecked" }}</p>
         <p>Timestamp: {{ timestamp }}</p>
     {% endif %}
     <a href="/">Back to Form</a>
@@ -178,11 +216,11 @@ async def read_form(request: Request):
     return templates.TemplateResponse("form.html", {"request": request})
 
 @app.post("/submit")
-async def submit_form(checkbox1: bool = Form(False), checkbox2: bool = Form(False)):
+async def submit_form(isdashboard: bool = Form(False), ischatbox: bool = Form(False)):
     conn = sqlite3.connect('checkbox_data.db')
     c = conn.cursor()
-    c.execute("INSERT INTO checkbox_values (checkbox1, checkbox2) VALUES (?, ?)",
-              (checkbox1, checkbox2))
+    c.execute("INSERT INTO checkbox_values (isdashboard, ischatbox) VALUES (?, ?)",
+              (isdashboard, ischatbox))
     conn.commit()
     conn.close()
     return {"message": "Data submitted successfully"}
@@ -191,16 +229,16 @@ async def submit_form(checkbox1: bool = Form(False), checkbox2: bool = Form(Fals
 async def read_results(request: Request):
     conn = sqlite3.connect('checkbox_data.db')
     c = conn.cursor()
-    c.execute("SELECT checkbox1, checkbox2, timestamp FROM checkbox_values ORDER BY id DESC LIMIT 1")
+    c.execute("SELECT isdashboard, ischatbox, timestamp FROM checkbox_values ORDER BY id DESC LIMIT 1")
     result = c.fetchone()
     conn.close()
 
     if result:
-        checkbox1, checkbox2, timestamp = result
+        isdashboard, ischatbox, timestamp = result
         return templates.TemplateResponse("results.html", {
             "request": request,
-            "checkbox1": checkbox1,
-            "checkbox2": checkbox2,
+            "isdashboard": isdashboard,
+            "ischatbox": ischatbox,
             "timestamp": timestamp
         })
     else:

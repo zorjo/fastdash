@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Checkbox Form</title>
+    </head>
+    <body>
+        <h1>Checkbox Form</h1>
+        <form action="/submit" method="post">
+            <label>
+                Email:
+                <input
+                    type="input"
+                    name="email"
+                    value="{{user}}"
+                    disabled
+                /> </label
+            ><br />
+            <label>
+                <input type="checkbox" name="isdashboard" value="true" />
+                Dashboard</label
+            ><br />
+            <label>
+                <input type="checkbox" name="ischatbox" value="true" />
+                Chatbox </label
+            ><br />
+            <input type="submit" value="Submit" />
+        </form>
+    </body>
+</html>
